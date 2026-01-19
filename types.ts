@@ -1,42 +1,30 @@
-export interface ResourceItem {
-  name: string;
-  description: string;
-  category: string;
-  url?: string;
-}
-
-export interface QuizQuestion {
-  text: string;
-  type: 'multiple_choice' | 'true_false' | 'complete';
-  options?: string[];
-  answer: string;
-}
+export type GenerationStatus = 'idle' | 'loading' | 'success' | 'error';
 
 export interface LessonPlan {
-  title: string;
-  gradeLevel: string;
-  estimatedTime: string;
-  objectives: string[];
-  hook: string;
-  sequence: string[];
-  activities: {
-    individual: string;
-    group: string;
-  };
+  topic: string;
+  grade: string;
+  subject: string;
+  learningOutcomes: string[];
+  // التعديل هنا: عناصر الدرس أصبحت تحتوي على عنوان وتفاصيل
+  contentElements: { title: string; details: string }[];
+  strategies: string[];
   differentiation: {
     gifted: string;
-    learningDifficulties: string;
+    struggling: string;
   };
-  resources: ResourceItem[];
-  additionalResources: ResourceItem[];
-  evaluation: {
+  resources: {
+    reading: string[];
+    video: string[];
+    interactive: string[];
+  };
+  assessment: {
     formative: string;
     authentic: string;
     summative: string;
-    quiz: {
-      questions: QuizQuestion[];
-    };
   };
+  quiz: {
+    question: string;
+    options: string[];
+    correctAnswer: string;
+  }[];
 }
-
-export type GenerationStatus = 'idle' | 'loading' | 'success' | 'error';
