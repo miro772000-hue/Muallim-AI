@@ -223,12 +223,14 @@ const PlanDisplay: React.FC<PlanDisplayProps> = ({ plan }) => {
                 <h2 className="text-2xl font-bold print:text-xl print:text-black">عناصر الدرس والعرض</h2>
               </div>
               <div className="bg-white rounded-xl border border-slate-200 p-0 overflow-hidden print:border-slate-300">
-                 {plan.sequence.map((item, idx) => (
-                   <div key={idx} className={`p-4 ${idx !== plan.sequence.length - 1 ? 'border-b border-slate-100' : ''} flex gap-3 hover:bg-slate-50 transition-colors print:break-inside-avoid`}>
-                      <div className="w-2 h-2 rounded-full bg-blue-500 mt-2.5 flex-shrink-0 print:bg-blue-600"></div>
-                      <p className="text-lg text-slate-700 print:text-base print:text-black">{item}</p>
-                   </div>
-                 ))}
+                 <div className="space-y-4">
+            {plan.contentElements.map((element, index) => (
+              <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                <h4 className="font-bold text-lg text-indigo-700 mb-2">{element.title}</h4>
+                <p className="text-gray-700 leading-relaxed text-right">{element.details}</p>
+              </div>
+            ))}
+          </div>
               </div>
             </section>
 
