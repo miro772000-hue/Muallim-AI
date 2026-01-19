@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
 import PlanDisplay from './components/PlanDisplay';
-import { generateLessonPlan } from './services/geminiService';
+// import { generateLessonPlan } from './services/geminiService';
 import { LessonPlan, GenerationStatus } from './types';
 import { AlertCircle, Compass, ScrollText } from 'lucide-react';
 
@@ -12,20 +12,12 @@ const App: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleGenerate = async (topic: string, grade: string, subject: string, strategies: string[] = [], contentElements: string[] = []) => {
-    setStatus('loading');
-    setErrorMsg(null);
-    setLessonPlan(null);
-
-    try {
-      const plan = await generateLessonPlan(topic, grade, subject, strategies, contentElements);
-      setLessonPlan(plan);
-      setStatus('success');
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("لم نتمكن من إنشاء خطة الدرس. يرجى التحقق من الاتصال بالإنترنت والمحاولة مرة أخرى.");
-      setStatus('error');
-    }
+    // هذا كود مؤقت لاختبار أن الشاشة تعمل
+    alert("مبروك! واجهة التطبيق تعمل بنجاح. المشكلة محصورة في ملف الذكاء الاصطناعي.");
+    console.log("UI Test: Success");
   };
+    
+     
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col">
