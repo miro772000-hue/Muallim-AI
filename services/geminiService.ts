@@ -15,10 +15,15 @@ const lessonPlanSchema: Schema = {
       description: "List of SMART objectives in Arabic",
     },
     hook: { type: Type.STRING, description: "The Hook / Introduction activity in Arabic" },
-    sequence: {
+    contentElements: {
       type: Type.ARRAY,
-      items: { type: Type.STRING },
-      description: "Bulleted list of lesson main concepts in Arabic",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "Lesson section title in Arabic" },
+          details: { type: Type.STRING, description: "Detailed scientific explanation (3-4 sentences) for this section in Arabic" }
+        },
+      },
     },
     activities: {
       type: Type.OBJECT,
@@ -100,7 +105,7 @@ const lessonPlanSchema: Schema = {
     "estimatedTime",
     "objectives",
     "hook",
-    "sequence",
+    "contentElements",
     "activities",
     "differentiation",
     "resources",
@@ -183,7 +188,7 @@ export const generateLessonPlan = async (topic: string, grade?: string, subject?
       : '';
 
     const contentElementsText = contentElements && contentElements.length > 0
-      ? `CRITICAL INSTRUCTION: The user has provided specific content elements/headings from the textbook that MUST be covered in this lesson. You must structure the 'sequence' and 'activities' to explicitly address these points: ${contentElements.join(' - ')}.`
+      ? `CRITICAL INSTRUCTION: The user has provided specific content elements/headings from the textbook that MUST be covered in this lesson. You must structure the 'contentElements' and 'activities' to explicitly cover these points.`
       : '';
 
     const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
