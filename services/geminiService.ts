@@ -181,35 +181,43 @@ CONTENT INTEGRITY:
 *   Language: High-quality Modern Standard Arabic (MSA).
 `;
 
-export const generateLessonPlan = async (topic: string, grade?: string, subject?: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
+export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    const strategiesText = strategies && strategies.length > 0 
-      ? `Specific Active Learning Strategies to Include: ${strategies.join(', ')}.` 
+    // 1. تجهيز النصوص بأمان تام (لمنع الخطأ إذا كانت البيانات فارغة)
+    // نستخدم Array.isArray للتأكد أن البيانات قائمة فعلاً قبل استخدام join
+    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies ? String(strategies) : '');
+    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements ? String(contentElements) : '');
+
+    // 2. صياغة التعليمات بناءً على المدخلات
+    const strategiesText = strategiesStr && strategiesStr.length > 0
+      ? `Specific Active Learning Strategies to Include: ${strategiesStr}.`
       : '';
 
-    const contentElementsText = contentElements && contentElements.length > 0
-    ? `CRITICAL INSTRUCTION: The user has provided these specific topics: [ ${contentElements.join(', ')} ]. You MUST use these topics exactly as the 'title' for each item in the 'contentElements' array, and generate detailed scientific 'details' for each one.`
-    : '';
+    const contentElementsText = contentStr && contentStr.length > 0
+      ? `CRITICAL INSTRUCTION: The user has provided these specific topics: [ ${contentStr} ]. You MUST use these topics exactly as the 'title' for each item in the 'contentElements' array, and generate concise scientific 'details' for each one.`
+      : '';
 
+    // 3. بناء الأمر النهائي (Prompt)
     const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
-    ${subject ? `Subject: ${subject}.` : ''} 
-    ${grade ? `Target Grade Level: ${grade}.` : ''} 
-    ${strategiesText}
-    ${contentElementsText}
-    
-    Context: Egyptian Ministry of Education (MoE) Official Curriculum.
-    
-    Requirements:
-    1. **Objectives**: Write 3-5 SMART objectives using **Bloom's Revised Taxonomy** verbs appropriate for the ${grade} level.
-    2. Employ pedagogical strategies from the Egyptian Teacher's Guide${strategiesText ? ', explicitly incorporating these requested strategies: ' + strategies?.join(', ') : ''}. Ensure you strictly follow the pedagogical steps for each selected strategy.
-    3. Ensure absolute accuracy of facts.
-    4. **Differentiation**: Include specific **Additional Activities** tailored for Gifted Students (Enrichment) and Students with Learning Difficulties (Support) as distinct sections.
-    5. **Stage Adaptation**: Ensure all activities are cognitively appropriate for the specified Grade Level (${grade}).
-    6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz (3-5 questions with answers)**.
-    7. **Resources with Links**: List specific learning resources. **CRITICAL**: Use the official E-Library link \`https://ellibrary.moe.gov.eg/books/\` for any textbook references.
-    8. **Content Coverage**: ${contentElements && contentElements.length > 0 ? 'Strictly cover the provided content elements.' : 'Cover the standard textbook topics for this lesson.'}
-    9. Output must be in formal Arabic.`;
+${subject ? `Subject: ${subject}.` : ''}
+${grade ? `Target Grade Level: ${grade}.` : ''}
+${strategiesText}
+${contentElementsText}
 
+Context: Egyptian Ministry of Education (MoE) Official Curriculum.
+
+Requirements:
+1. **Objectives**: Write 3-5 SMART objectives using **Bloom's Revised Taxonomy** verbs appropriate for the ${grade} level.
+2. Employ pedagogical strategies from the Egyptian Teacher's Guide${strategiesText ? `, explicitly incorporating these requested strategies.` : ''}. Ensure you strictly follow the pedagogical steps for each selected strategy.
+3. Ensure absolute accuracy of facts.
+4. **Differentiation**: Include specific **Additional Activities** tailored for Gifted Students (Enrichment) and Students with Learning Difficulties (Support) as distinct sections.
+5. **Stage Adaptation**: Ensure all activities are cognitively appropriate for the specified Grade Level (${grade}).
+6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz (3-5 questions with answers)**.
+7. **Resources with Links**: List specific learning resources. **CRITICAL**: Use the official E-Library link 'https://ellibrary.moe.gov.eg/books/' for any textbook references.
+8. **Content Coverage**: ${contentStr ? 'Strictly cover the provided content elements.' : 'Cover the standard textbook topics for this lesson.'}
+9. Output must be in formal Arabic.`;
+
+    // 4. الاتصال بالذكاء الاصطناعي (باستخدام الموديل السريع 1.5)
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash",
       contents: prompt,
@@ -217,7 +225,7 @@ export const generateLessonPlan = async (topic: string, grade?: string, subject?
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
         responseSchema: lessonPlanSchema,
-        temperature: 0.5, 
+        temperature: 0.5,
       },
     });
 
@@ -228,6 +236,7 @@ export const generateLessonPlan = async (topic: string, grade?: string, subject?
 
     const data = JSON.parse(text) as LessonPlan;
     return data;
+
   } catch (error) {
     console.error("Error generating lesson plan:", error);
     throw error;
