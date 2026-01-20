@@ -1,62 +1,78 @@
 import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
-  // 🟢 هذا السطر يأخذ المفتاح من إعدادات Vercel السرية ولا يظهره في الكود
+  // 1. جلب المفتاح من Vercel
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
-  // التحقق من وجود المفتاح
   if (!API_KEY || API_KEY.length < 10) {
-    alert("تنبيه: مفتاح API غير موجود في إعدادات Vercel. يرجى إضافته في Environment Variables.");
+    alert("تنبيه: مفتاح API غير موجود. تأكد من إعدادات Vercel.");
     throw new Error("Missing API Key");
   }
 
-  // دالة ذكية لاختيار الموديل المناسب تلقائياً
-  const getAvailableModel = async (): Promise<string> => {
+  // 2. دالة تنظيف ذكية لاستخراج JSON حتى لو كان الرد طويلاً جداً
+  const cleanAndParseJSON = (text: string): any => {
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
-      const data = await response.json();
+      // إزالة علامات الكود (Markdown)
+      let clean = text.replace(/```json/g, '').replace(/```/g, '');
       
-      // محاولة العثور على موديل يدعم التوليد
-      if (data.models) {
-        const validModel = data.models.find((m: any) => 
-          m.name.includes('gemini') && 
-          m.supportedGenerationMethods?.includes('generateContent')
-        );
-        if (validModel) return validModel.name;
+      // محاولة العثور على بداية ونهاية كائن JSON
+      const firstBrace = clean.indexOf('{');
+      const lastBrace = clean.lastIndexOf('}');
+      
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        clean = clean.substring(firstBrace, lastBrace + 1);
       }
-      return "models/gemini-pro"; // الموديل الاحتياطي
+      
+      return JSON.parse(clean);
     } catch (e) {
-      return "models/gemini-pro";
+      console.error("JSON Parse Error:", e);
+      throw new Error("فشل في قراءة تنسيق الخطة، يرجى المحاولة مرة أخرى.");
     }
   };
 
   try {
-    const modelName = await getAvailableModel();
-    console.log("Using Model:", modelName);
+    const modelName = "models/gemini-pro";
 
-    // تجهيز البيانات
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
     
-    const promptText = `Act as an expert Egyptian teacher. Create a lesson plan for: "${topic}".
+    // 3. الأمر (Prompt) المعدل لطلب التفاصيل والشمولية
+    const promptText = `Act as a senior expert Egyptian teacher. Create a HIGHLY DETAILED and COMPREHENSIVE lesson plan for: "${topic}".
     Subject: ${subject}. Grade: ${grade}.
     Strategies: ${strategiesStr}.
     Content: ${contentStr}.
     
-    Format: JSON only.
-    Language: Arabic.
-    Structure: {
+    CRITICAL INSTRUCTIONS:
+    - Output MUST be valid JSON only.
+    - Do NOT summarize. Be verbose and detailed.
+    - Objectives: Write 3-5 distinct, measurable SMART objectives.
+    - Content: Provide detailed explanations, not just headlines.
+    - Procedures: Describe the teacher's role and student's role in detail.
+    - Assessment: Provide specific questions, not general ideas.
+    
+    Structure:
+    {
       "title": "Lesson Title",
-      "gradeLevel": "Grade",
-      "estimatedTime": "Time",
-      "objectives": ["Obj1", "Obj2"],
-      "hook": "Activity",
-      "contentElements": [{"title": "Subtopic", "details": "Explanation"}],
-      "differentiation": {"gifted": "Activity", "support": "Activity"},
-      "assessment": {"formative": "Q", "summative": "Q"}
-    }`;
+      "gradeLevel": "${grade}",
+      "estimatedTime": "45 min",
+      "objectives": ["Detailed Objective 1", "Detailed Objective 2", "Detailed Objective 3"],
+      "hook": "Engaging starter activity description",
+      "contentElements": [
+        {"title": "Main Idea 1", "details": "Comprehensive explanation of the concept..."}, 
+        {"title": "Main Idea 2", "details": "Comprehensive explanation of the concept..."}
+      ],
+      "differentiation": {
+        "gifted": "Challenging activity description...", 
+        "support": "Remedial activity description..."
+      },
+      "assessment": {
+        "formative": "Specific questions to ask during class...", 
+        "summative": "Quiz questions or homework..."
+      }
+    }
+    Language: Arabic (Modern Standard Arabic).`;
 
-    // الاتصال الآمن
+    // 4. الاتصال
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -72,21 +88,33 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || response.statusText);
+      const err = await response.json();
+      throw new Error(err.error?.message || "Google API Error");
     }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) throw new Error("No text found.");
+    if (!rawText) throw new Error("No text returned.");
 
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanText) as LessonPlan;
+    // 5. التحويل والتنظيف
+    return cleanAndParseJSON(rawText) as LessonPlan;
 
   } catch (error: any) {
-    console.error("Error:", error);
-    alert("حدث خطأ أثناء الاتصال. تأكد من إعدادات المفتاح في Vercel.");
-    throw error;
+    console.error("Service Error:", error);
+    // رسالة تنبيه واضحة بدلاً من الشاشة البيضاء
+    alert("حدث خطأ أثناء معالجة البيانات التفصيلية. يرجى المحاولة مرة أخرى.");
+    
+    // إرجاع كائن فارغ لتجنب انهيار الصفحة (الشاشة البيضاء)
+    return {
+      title: topic,
+      gradeLevel: grade,
+      estimatedTime: "45 دقيقة",
+      objectives: ["تعذر تحميل الأهداف التفصيلية، حاول مرة أخرى."],
+      hook: "",
+      contentElements: [],
+      differentiation: { gifted: "", support: "" },
+      assessment: { formative: "", summative: "" }
+    };
   }
 };
