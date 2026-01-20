@@ -1,19 +1,38 @@
 import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
-  // مفتاحك
   const API_KEY = "AIzaSyABq78Ujul5nIGCD00iFTs9JiCWFeXFaW0";
   
-  const showError = (msg: string) => {
-    alert(`تفاصيل الخطأ: ${msg}`);
-    console.error(msg);
+  // دالة مساعدة لاكتشاف الموديل المتاح تلقائياً
+  const getAvailableModel = async (): Promise<string> => {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
+      const data = await response.json();
+      
+      if (!data.models) return "models/gemini-pro"; // اسم احتياطي
+
+      // البحث عن أول موديل يدعم التلخيص والإنشاء
+      const validModel = data.models.find((m: any) => 
+        m.name.includes('gemini') && 
+        m.supportedGenerationMethods?.includes('generateContent')
+      );
+
+      return validModel ? validModel.name : "models/gemini-pro";
+    } catch (e) {
+      console.error("فشل اكتشاف الموديل، سنستخدم الافتراضي", e);
+      return "models/gemini-pro";
+    }
   };
 
   try {
+    // 1. اكتشاف اسم الموديل الصحيح المتاح لحسابك
+    const modelName = await getAvailableModel();
+    console.log("تم اختيار الموديل تلقائياً:", modelName);
+
+    // 2. تجهيز البيانات
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
     
-    // بناء الطلب
     const promptText = `Act as an expert Egyptian teacher. Create a lesson plan for: "${topic}".
     Subject: ${subject}. Grade: ${grade}.
     Strategies: ${strategiesStr}.
@@ -32,9 +51,8 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
       "assessment": {"formative": "Q", "summative": "Q"}
     }`;
 
-    // 🛑 التعديل هنا: استخدام الاسم الرقمي الدقيق (gemini-1.0-pro)
-    // ده الاسم اللي السيرفرات القديمة والجديدة بتشوفه
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${API_KEY}`, {
+    // 3. الاتصال بالموديل المكتشف
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -50,20 +68,12 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
 
     if (!response.ok) {
       const errorData = await response.json();
-      const errorMessage = errorData.error?.message || response.statusText;
-      // لو حتى ده فشل، هنظهر الرسالة عشان نعرف الخطوة الجاية
-      showError(`خطأ جوجل (${response.status}): ${errorMessage}`);
-      throw new Error(errorMessage);
+      throw new Error(errorData.error?.message || response.statusText);
     }
 
     const data = await response.json();
-    
-    if (!data.candidates || data.candidates.length === 0) {
-        showError("جوجل رد برد فاضي (Empty Response).");
-        throw new Error("No candidates");
-    }
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    const text = data.candidates[0].content?.parts?.[0]?.text;
     if (!text) throw new Error("No text found.");
 
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -71,9 +81,7 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
 
   } catch (error: any) {
     console.error("Final Error:", error);
-    if (!error.message.includes("تفاصيل")) {
-        alert(`حدث خطأ: ${error.message}`);
-    }
+    alert(`عذراً، حدث خطأ: ${error.message}`);
     throw error;
   }
 };
