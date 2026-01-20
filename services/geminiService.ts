@@ -1,9 +1,8 @@
 import { LessonPlan } from "../types";
 
-// هذا الكود يتصل بجوجل مباشرة لتجنب مشاكل المكتبات القديمة
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    // مفتاحك تم وضعه هنا مباشرة
+    // مفتاحك الصحيح
     const API_KEY = "AIzaSyABq78Ujul5nIGCD00iFTs9JiCWFeXFaW0";
 
     // 1. تجهيز البيانات
@@ -25,8 +24,9 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     - Output in Arabic.
     - RETURN ONLY RAW JSON.`;
 
-    // 3. الاتصال المباشر (Direct Call)
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+    // 3. الاتصال بالموديل القياسي (gemini-pro) لضمان العمل 100%
+    // تم تغيير الرابط هنا لتجاوز مشكلة الموديل السابق
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -49,7 +49,7 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
 
     if (!text) throw new Error("No text returned from Gemini.");
 
-    // 4. تنظيف الرد من علامات الكود
+    // 4. تنظيف الرد
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(cleanText) as LessonPlan;
