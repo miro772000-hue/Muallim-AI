@@ -1,35 +1,40 @@
 import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
-  const API_KEY = "AIzaSyABq78Ujul5nIGCD00iFTs9JiCWFeXFaW0";
-  
-  // دالة مساعدة لاكتشاف الموديل المتاح تلقائياً
+  // 🟢 هذا السطر يأخذ المفتاح من إعدادات Vercel السرية ولا يظهره في الكود
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
+
+  // التحقق من وجود المفتاح
+  if (!API_KEY || API_KEY.length < 10) {
+    alert("تنبيه: مفتاح API غير موجود في إعدادات Vercel. يرجى إضافته في Environment Variables.");
+    throw new Error("Missing API Key");
+  }
+
+  // دالة ذكية لاختيار الموديل المناسب تلقائياً
   const getAvailableModel = async (): Promise<string> => {
     try {
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`);
       const data = await response.json();
       
-      if (!data.models) return "models/gemini-pro"; // اسم احتياطي
-
-      // البحث عن أول موديل يدعم التلخيص والإنشاء
-      const validModel = data.models.find((m: any) => 
-        m.name.includes('gemini') && 
-        m.supportedGenerationMethods?.includes('generateContent')
-      );
-
-      return validModel ? validModel.name : "models/gemini-pro";
+      // محاولة العثور على موديل يدعم التوليد
+      if (data.models) {
+        const validModel = data.models.find((m: any) => 
+          m.name.includes('gemini') && 
+          m.supportedGenerationMethods?.includes('generateContent')
+        );
+        if (validModel) return validModel.name;
+      }
+      return "models/gemini-pro"; // الموديل الاحتياطي
     } catch (e) {
-      console.error("فشل اكتشاف الموديل، سنستخدم الافتراضي", e);
       return "models/gemini-pro";
     }
   };
 
   try {
-    // 1. اكتشاف اسم الموديل الصحيح المتاح لحسابك
     const modelName = await getAvailableModel();
-    console.log("تم اختيار الموديل تلقائياً:", modelName);
+    console.log("Using Model:", modelName);
 
-    // 2. تجهيز البيانات
+    // تجهيز البيانات
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
     
@@ -51,7 +56,7 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
       "assessment": {"formative": "Q", "summative": "Q"}
     }`;
 
-    // 3. الاتصال بالموديل المكتشف
+    // الاتصال الآمن
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,8 +85,8 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     return JSON.parse(cleanText) as LessonPlan;
 
   } catch (error: any) {
-    console.error("Final Error:", error);
-    alert(`عذراً، حدث خطأ: ${error.message}`);
+    console.error("Error:", error);
+    alert("حدث خطأ أثناء الاتصال. تأكد من إعدادات المفتاح في Vercel.");
     throw error;
   }
 };
