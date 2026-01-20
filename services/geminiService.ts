@@ -183,15 +183,14 @@ CONTENT INTEGRITY:
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    // 1. تأمين البيانات: نتأكد إن مفيش حاجة "undefined" عشان الكود مايضربش
+    // 1. تجهيز البيانات
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
 
-    // 2. تجهيز الجمل اللي هتتبعت للذكاء الاصطناعي
     const strategiesText = strategiesStr ? `Specific Active Learning Strategies: ${strategiesStr}.` : '';
     const contentElementsText = contentStr ? `Cover these specific topics: [ ${contentStr} ].` : '';
 
-    // 3. كتابة الأمر (Prompt) بوضوح
+    // 2. الأمر (Prompt)
     const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
 ${subject ? `Subject: ${subject}.` : ''}
 ${grade ? `Target Grade Level: ${grade}.` : ''}
@@ -212,13 +211,12 @@ Requirements:
 9. Output must be in formal Arabic.
 10. **CRITICAL**: Return ONLY raw JSON code. Do not wrap in markdown or code blocks.`;
 
-    // 4. الاتصال بالموديل الجديد (gemini-1.5-flash)
-    // ⚠️ لاحظي: شلنا responseSchema و responseMimeType عشان يشتغل بحرية
+    // 3. الاتصال بالموديل القديم (المتوافق مع مكتبتك)
+    // ⚠️ لاحظي: شلنا كل الإعدادات عشان يشتغل، واستخدمنا gemini-pro
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash",
+      model: "gemini-pro",
       contents: prompt,
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
         temperature: 0.5,
       },
     });
@@ -228,7 +226,7 @@ Requirements:
       throw new Error("No response text received from Gemini.");
     }
 
-    // 5. التنظيف اليدوي: بنشيل أي علامات زيادة عشان نضمن إن الـ JSON سليم
+    // 4. تنظيف الرد يدوياً (عشان الموديل القديم بيحب يرغي)
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(cleanText) as LessonPlan;
