@@ -188,8 +188,8 @@ export const generateLessonPlan = async (topic: string, grade?: string, subject?
       : '';
 
     const contentElementsText = contentElements && contentElements.length > 0
-      ? `CRITICAL INSTRUCTION: The user has provided specific content elements/headings from the textbook that MUST be covered in this lesson. You must structure the 'contentElements' and 'activities' to explicitly cover these points.`
-      : '';
+    ? `CRITICAL INSTRUCTION: The user has provided these specific topics: [ ${contentElements.join(', ')} ]. You MUST use these topics exactly as the 'title' for each item in the 'contentElements' array, and generate detailed scientific 'details' for each one.`
+    : '';
 
     const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
     ${subject ? `Subject: ${subject}.` : ''} 
