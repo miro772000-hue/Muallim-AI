@@ -1,62 +1,54 @@
 import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
-  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-
-  // 1. تعريف "خطة الطوارئ" (عشان لو حصل أي كارثة، دي اللي تظهر بدل الشاشة البيضاء)
-  const fallbackPlan: LessonPlan = {
-    title: topic || "خطة الدرس",
-    gradeLevel: grade || "عام",
+  
+  // 1. تعريف خطة الطوارئ (تظهر في حالة حدوث أي خطأ لمنع الشاشة البيضاء)
+  const safeFallback: LessonPlan = {
+    title: topic || "عنوان الدرس",
+    gradeLevel: grade || "الصف الدراسي",
     estimatedTime: "45 دقيقة",
-    objectives: ["تعذر جلب الأهداف بسبب ضعف الشبكة، يرجى المحاولة مرة أخرى."],
-    hook: "يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.",
-    contentElements: [{ title: "تنبيه", details: "حدث خطأ أثناء الاتصال بجوجل." }],
+    objectives: ["حدث خطأ في الاتصال، ولكن تم الحفاظ على عمل التطبيق.", "يرجى المحاولة مرة أخرى لاحقاً."],
+    hook: "نشاط تمهيدي بسيط.",
+    contentElements: [
+        { title: "تنبيه", details: "لم نتمكن من جلب المحتوى من الذكاء الاصطناعي بسبب ضعف الشبكة أو خطأ في المفتاح." }
+    ],
     differentiation: { gifted: "-", support: "-" },
     assessment: { formative: "-", summative: "-" }
   };
 
-  if (!API_KEY) {
-    alert("مفتاح API غير موجود.");
-    return fallbackPlan;
-  }
-
-  // 2. دالة "التنظيف" (تضمن إن البيانات سليمة عشان الموقع مايقعش)
-  const sanitize = (data: any): LessonPlan => {
-    return {
-      title: data?.title || topic,
-      gradeLevel: data?.gradeLevel || grade,
-      estimatedTime: data?.estimatedTime || "45 دقيقة",
-      objectives: Array.isArray(data?.objectives) ? data.objectives : ["هدف 1", "هدف 2"],
-      hook: data?.hook || "نشاط تمهيدي",
-      contentElements: Array.isArray(data?.contentElements) ? data.contentElements : [],
-      differentiation: {
-        gifted: data?.differentiation?.gifted || "نشاط إثرائي",
-        support: data?.differentiation?.support || "نشاط علاجي"
-      },
-      assessment: {
-        formative: data?.assessment?.formative || "تقييم تكويني",
-        summative: data?.assessment?.summative || "تقييم ختامي"
-      }
-    };
-  };
-
   try {
+    // 2. محاولة جلب المفتاح بأمان تام
+    let API_KEY = "";
+    try {
+        // @ts-ignore
+        API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+    } catch (e) {
+        console.error("Error reading env:", e);
+    }
+
+    // إذا لم نجد المفتاح، نرجع خطة الطوارئ بدلاً من انهيار التطبيق
+    if (!API_KEY || typeof API_KEY !== 'string') {
+        console.warn("No API Key found");
+        return { ...safeFallback, objectives: ["عذراً، مفتاح API مفقود في إعدادات Vercel."] };
+    }
+
+    // 3. تجهيز البيانات
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
     
-    // 3. الأمر (Prompt)
-    const promptText = `Act as an expert Egyptian teacher. Create a DETAILED lesson plan for: "${topic}".
+    // 4. الأمر (Prompt) - قللنا الحجم قليلاً لتجنب انقطاع الشبكة (Timeout)
+    const promptText = `Act as an expert Egyptian teacher. Create a lesson plan for: "${topic}".
     Subject: ${subject}. Grade: ${grade}.
     Strategies: ${strategiesStr}.
     Content: ${contentStr}.
     
-    Output strictly VALID JSON.
+    Format: VALID JSON ONLY. No Markdown.
     Structure:
     {
       "title": "Lesson Title",
       "gradeLevel": "Grade",
       "estimatedTime": "Time",
-      "objectives": ["Smart Objective 1", "Smart Objective 2"],
+      "objectives": ["Obj1", "Obj2", "Obj3"],
       "hook": "Activity",
       "contentElements": [{"title": "Concept", "details": "Explanation"}],
       "differentiation": {"gifted": "Task", "support": "Task"},
@@ -64,7 +56,10 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     }
     Language: Arabic.`;
 
-    // 4. الاتصال
+    // 5. الاتصال بجوجل (مع مهلة زمنية لتجنب التعليق)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // إيقاف المحاولة بعد 15 ثانية
+
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -76,29 +71,41 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
             { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
             { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
         ]
-      })
+      }),
+      signal: controller.signal
     });
 
-    if (!response.ok) throw new Error(`Google Error: ${response.status}`);
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+        throw new Error(`Google Error: ${response.status}`);
+    }
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (!text) throw new Error("Empty response");
+    if (!rawText) throw new Error("No text returned");
 
-    // تنظيف JSON
-    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    // 6. تنظيف النص وتحويله
+    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     const parsedData = JSON.parse(cleanText);
 
-    // إرجاع البيانات النظيفة
-    return sanitize(parsedData);
+    // التأكد من أن النتيجة تحتوي على الحد الأدنى من البيانات
+    return {
+        title: parsedData.title || topic,
+        gradeLevel: parsedData.gradeLevel || grade,
+        estimatedTime: parsedData.estimatedTime || "45 دقيقة",
+        objectives: Array.isArray(parsedData.objectives) ? parsedData.objectives : ["هدف 1", "هدف 2"],
+        hook: parsedData.hook || "نشاط",
+        contentElements: Array.isArray(parsedData.contentElements) ? parsedData.contentElements : [],
+        differentiation: parsedData.differentiation || { gifted: "", support: "" },
+        assessment: parsedData.assessment || { formative: "", summative: "" }
+    };
 
   } catch (error) {
-    console.error("GENERATION ERROR:", error);
-    // 🛑 أهم سطر: في حالة الخطأ، نرجع خطة الطوارئ بدل ما الموقع ينهار
-    return sanitize({
-      ...fallbackPlan,
-      objectives: ["حدث خطأ في الشبكة (Network Error) أو في تحليل البيانات.", "يرجى المحاولة مرة أخرى."]
-    });
+    console.error("CRITICAL ERROR:", error);
+    // 🛑 هذا هو السطر الذي يمنع الشاشة البيضاء
+    // مهما كان الخطأ (شبكة، مفتاح، كود)، سنرجع خطة الطوارئ
+    return safeFallback;
   }
 };
