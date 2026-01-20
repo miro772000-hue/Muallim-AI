@@ -183,9 +183,9 @@ CONTENT INTEGRITY:
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    // 1. تجهيز البيانات (ببساطة شديدة)
-    const strategiesStr = strategies ? String(strategies) : '';
-    const contentStr = contentElements ? String(contentElements) : '';
+    // 1. تجهيز البيانات
+    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
+    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
 
     const strategiesText = strategiesStr ? `Active Strategies: ${strategiesStr}` : '';
     const contentElementsText = contentStr ? `Content Topics: ${contentStr}` : '';
@@ -209,10 +209,10 @@ Requirements:
 7. Output in Arabic.
 8. **IMPORTANT**: Return ONLY valid JSON. No Markdown. No text outside JSON.`;
 
-    // 3. الاتصال بالموديل (النسخة 1.0 بالتحديد)
-    // استخدمنا "gemini-1.0-pro" لأنه الاسم اللي المكتبات القديمة فاهماه
+    // 3. الاتصال بالموديل (بالاسم الرقمي الدقيق جداً)
+    // هذا الاسم "gemini-1.5-flash-001" هو النسخة المستقرة التي تعمل مع جميع المكتبات
     const response = await ai.models.generateContent({
-      model: "gemini-1.0-pro",
+      model: "gemini-1.5-flash-001",
       contents: prompt,
     });
 
@@ -221,7 +221,7 @@ Requirements:
       throw new Error("No response.");
     }
 
-    // 4. تنظيف عنيف للرد (عشان نضمن إنه يشتغل)
+    // 4. تنظيف الرد
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(cleanText) as LessonPlan;
@@ -230,4 +230,4 @@ Requirements:
     console.error("Error:", error);
     throw error;
   }
-};;
+};
