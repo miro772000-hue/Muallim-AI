@@ -213,12 +213,11 @@ Requirements:
 
     // الاتصال بالموديل السريع (1.5-flash)
     const response = await ai.models.generateContent({
-    model: "gemini-pro",
+     model: "gemini-pro",
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: "application/json",
-        responseSchema: lessonPlanSchema,
+        
         temperature: 0.5,
       },
     });
