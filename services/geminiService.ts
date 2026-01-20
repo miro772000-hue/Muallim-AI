@@ -183,15 +183,15 @@ CONTENT INTEGRITY:
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    // معالجة البيانات بأمان عشان لو فاضية الكود مايضربش
+    // 1. تجهيز البيانات بأمان لتجنب الأخطاء إذا كانت الخانات فارغة
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
 
-    // تجهيز النصوص للأمر
+    // 2. تجهيز نصوص التعليمات
     const strategiesText = strategiesStr ? `Specific Active Learning Strategies: ${strategiesStr}.` : '';
     const contentElementsText = contentStr ? `Cover these specific topics: [ ${contentStr} ].` : '';
 
-    // بناء الأمر (Prompt)
+    // 3. كتابة الأمر (Prompt)
     const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
 ${subject ? `Subject: ${subject}.` : ''}
 ${grade ? `Target Grade Level: ${grade}.` : ''}
@@ -201,23 +201,23 @@ ${contentElementsText}
 Context: Egyptian Ministry of Education (MoE) Official Curriculum.
 
 Requirements:
-1. **Objectives**: Write 3-5 SMART objectives using **Bloom's Revised Taxonomy** verbs appropriate for the ${grade} level.
+1. **Objectives**: Write 3-5 SMART objectives using **Bloom's Revised Taxonomy** verbs.
 2. Employ pedagogical strategies from the Egyptian Teacher's Guide.
 3. Ensure absolute accuracy of facts.
 4. **Differentiation**: Include specific activities for Gifted Students and Students with Learning Difficulties.
 5. **Stage Adaptation**: Ensure activities are appropriate for Grade (${grade}).
-6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz (3-5 questions)**.
+6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz**.
 7. **Resources**: Use the official E-Library link 'https://ellibrary.moe.gov.eg/books/'.
 8. **Content**: ${contentStr ? 'Strictly cover the provided topics.' : 'Cover standard textbook topics.'}
-9. Output must be in formal Arabic.`;
+9. Output must be in formal Arabic.
+10. **IMPORTANT**: Return raw JSON only. Do not use Markdown formatting.`;
 
-    // الاتصال بالموديل السريع (1.5-flash)
+    // 4. الاتصال بالموديل الجديد (1.5-flash) بدون قيود برمجية معقدة
     const response = await ai.models.generateContent({
-     model: "gemini-pro",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        
         temperature: 0.5,
       },
     });
@@ -227,7 +227,10 @@ Requirements:
       throw new Error("No response text received from Gemini.");
     }
 
-    return JSON.parse(text) as LessonPlan;
+    // 5. تنظيف الرد من أي رموز إضافية (مثل ```json) لضمان عمل الكود
+    const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    return JSON.parse(cleanText) as LessonPlan;
 
   } catch (error) {
     console.error("Error generating lesson plan:", error);
