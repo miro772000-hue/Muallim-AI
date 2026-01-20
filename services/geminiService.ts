@@ -183,21 +183,15 @@ CONTENT INTEGRITY:
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    // 1. تجهيز النصوص بأمان تام (لمنع الخطأ إذا كانت البيانات فارغة)
-    // نستخدم Array.isArray للتأكد أن البيانات قائمة فعلاً قبل استخدام join
-    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies ? String(strategies) : '');
-    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements ? String(contentElements) : '');
+    // معالجة البيانات بأمان عشان لو فاضية الكود مايضربش
+    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
+    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
 
-    // 2. صياغة التعليمات بناءً على المدخلات
-    const strategiesText = strategiesStr && strategiesStr.length > 0
-      ? `Specific Active Learning Strategies to Include: ${strategiesStr}.`
-      : '';
+    // تجهيز النصوص للأمر
+    const strategiesText = strategiesStr ? `Specific Active Learning Strategies: ${strategiesStr}.` : '';
+    const contentElementsText = contentStr ? `Cover these specific topics: [ ${contentStr} ].` : '';
 
-    const contentElementsText = contentStr && contentStr.length > 0
-      ? `CRITICAL INSTRUCTION: The user has provided these specific topics: [ ${contentStr} ]. You MUST use these topics exactly as the 'title' for each item in the 'contentElements' array, and generate concise scientific 'details' for each one.`
-      : '';
-
-    // 3. بناء الأمر النهائي (Prompt)
+    // بناء الأمر (Prompt)
     const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
 ${subject ? `Subject: ${subject}.` : ''}
 ${grade ? `Target Grade Level: ${grade}.` : ''}
@@ -208,16 +202,16 @@ Context: Egyptian Ministry of Education (MoE) Official Curriculum.
 
 Requirements:
 1. **Objectives**: Write 3-5 SMART objectives using **Bloom's Revised Taxonomy** verbs appropriate for the ${grade} level.
-2. Employ pedagogical strategies from the Egyptian Teacher's Guide${strategiesText ? `, explicitly incorporating these requested strategies.` : ''}. Ensure you strictly follow the pedagogical steps for each selected strategy.
+2. Employ pedagogical strategies from the Egyptian Teacher's Guide.
 3. Ensure absolute accuracy of facts.
-4. **Differentiation**: Include specific **Additional Activities** tailored for Gifted Students (Enrichment) and Students with Learning Difficulties (Support) as distinct sections.
-5. **Stage Adaptation**: Ensure all activities are cognitively appropriate for the specified Grade Level (${grade}).
-6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz (3-5 questions with answers)**.
-7. **Resources with Links**: List specific learning resources. **CRITICAL**: Use the official E-Library link 'https://ellibrary.moe.gov.eg/books/' for any textbook references.
-8. **Content Coverage**: ${contentStr ? 'Strictly cover the provided content elements.' : 'Cover the standard textbook topics for this lesson.'}
+4. **Differentiation**: Include specific activities for Gifted Students and Students with Learning Difficulties.
+5. **Stage Adaptation**: Ensure activities are appropriate for Grade (${grade}).
+6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz (3-5 questions)**.
+7. **Resources**: Use the official E-Library link 'https://ellibrary.moe.gov.eg/books/'.
+8. **Content**: ${contentStr ? 'Strictly cover the provided topics.' : 'Cover standard textbook topics.'}
 9. Output must be in formal Arabic.`;
 
-    // 4. الاتصال بالذكاء الاصطناعي (باستخدام الموديل السريع 1.5)
+    // الاتصال بالموديل السريع (1.5-flash)
     const response = await ai.models.generateContent({
       model: "gemini-1.5-flash",
       contents: prompt,
@@ -234,8 +228,7 @@ Requirements:
       throw new Error("No response text received from Gemini.");
     }
 
-    const data = JSON.parse(text) as LessonPlan;
-    return data;
+    return JSON.parse(text) as LessonPlan;
 
   } catch (error) {
     console.error("Error generating lesson plan:", error);
