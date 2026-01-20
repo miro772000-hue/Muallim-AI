@@ -183,56 +183,51 @@ CONTENT INTEGRITY:
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   try {
-    // 1. تجهيز البيانات
-    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
-    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
+    // 1. تجهيز البيانات (ببساطة شديدة)
+    const strategiesStr = strategies ? String(strategies) : '';
+    const contentStr = contentElements ? String(contentElements) : '';
 
-    const strategiesText = strategiesStr ? `Specific Active Learning Strategies: ${strategiesStr}.` : '';
-    const contentElementsText = contentStr ? `Cover these specific topics: [ ${contentStr} ].` : '';
+    const strategiesText = strategiesStr ? `Active Strategies: ${strategiesStr}` : '';
+    const contentElementsText = contentStr ? `Content Topics: ${contentStr}` : '';
 
     // 2. الأمر (Prompt)
-    const prompt = `Design a comprehensive lesson plan for the topic: "${topic}".
+    const prompt = `Create a lesson plan for "${topic}".
 ${subject ? `Subject: ${subject}.` : ''}
-${grade ? `Target Grade Level: ${grade}.` : ''}
+${grade ? `Grade: ${grade}.` : ''}
 ${strategiesText}
 ${contentElementsText}
 
-Context: Egyptian Ministry of Education (MoE) Official Curriculum.
+Context: Egyptian Ministry of Education.
 
 Requirements:
-1. **Objectives**: Write 3-5 SMART objectives using **Bloom's Revised Taxonomy** verbs.
-2. Employ pedagogical strategies from the Egyptian Teacher's Guide.
-3. Ensure absolute accuracy of facts.
-4. **Differentiation**: Include specific activities for Gifted Students and Students with Learning Difficulties.
-5. **Stage Adaptation**: Ensure activities are appropriate for Grade (${grade}).
-6. **Evaluation**: Include Formative, Authentic, Summative, and a **Short Quiz**.
-7. **Resources**: Use the official E-Library link 'https://ellibrary.moe.gov.eg/books/'.
-8. **Content**: ${contentStr ? 'Strictly cover the provided topics.' : 'Cover standard textbook topics.'}
-9. Output must be in formal Arabic.
-10. **CRITICAL**: Return ONLY raw JSON code. Do not wrap in markdown or code blocks.`;
+1. 3-5 SMART Objectives (Bloom's Taxonomy).
+2. Pedagogical Strategies from Egyptian Teacher's Guide.
+3. Accurate facts.
+4. Differentiation (Gifted & Support activities).
+5. Evaluation (Formative, Summative, Quiz).
+6. Resources: Use 'https://ellibrary.moe.gov.eg/books/'.
+7. Output in Arabic.
+8. **IMPORTANT**: Return ONLY valid JSON. No Markdown. No text outside JSON.`;
 
-    // 3. الاتصال بالموديل القديم (المتوافق مع مكتبتك)
-    // ⚠️ لاحظي: شلنا كل الإعدادات عشان يشتغل، واستخدمنا gemini-pro
+    // 3. الاتصال بالموديل (النسخة 1.0 بالتحديد)
+    // استخدمنا "gemini-1.0-pro" لأنه الاسم اللي المكتبات القديمة فاهماه
     const response = await ai.models.generateContent({
-      model: "gemini-pro",
+      model: "gemini-1.0-pro",
       contents: prompt,
-      config: {
-        temperature: 0.5,
-      },
     });
 
     const text = response.text;
     if (!text) {
-      throw new Error("No response text received from Gemini.");
+      throw new Error("No response.");
     }
 
-    // 4. تنظيف الرد يدوياً (عشان الموديل القديم بيحب يرغي)
+    // 4. تنظيف عنيف للرد (عشان نضمن إنه يشتغل)
     const cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
     return JSON.parse(cleanText) as LessonPlan;
 
   } catch (error) {
-    console.error("Error generating lesson plan:", error);
+    console.error("Error:", error);
     throw error;
   }
-};
+};;
