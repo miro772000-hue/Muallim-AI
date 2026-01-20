@@ -2,85 +2,40 @@ import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   
-  // 🟢 1. قارب النجاة: خطة احتياطية كاملة تمنع الشاشة البيضاء
-  // هذه الخطة ستظهر فوراً لو حصل أي خطأ في النظام
-  const LIFE_RAFT: LessonPlan = {
-    title: topic || "عنوان الدرس (خطة طوارئ)",
-    gradeLevel: grade || "الصف",
+  console.log("بدء اختبار المحاكاة...");
+
+  // 1. محاكاة وقت التحميل (انتظار 3 ثواني وكأننا بنتصل بجوجل)
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  // 2. إرجاع بيانات ثابتة (بدون أي اتصال حقيقي)
+  // الهدف: التأكد هل الصفحة قادرة تعرض بيانات ولا لأ؟
+  return {
+    title: topic || "درس تجريبي (وضع الاختبار)",
+    gradeLevel: grade || "الرابع الابتدائي",
     estimatedTime: "45 دقيقة",
     objectives: [
-        "لم نتمكن من توليد الأهداف بسبب خطأ في الاتصال.",
-        "يرجى التأكد من مفتاح API واتصال الإنترنت.",
-        "هذه بيانات مؤقتة لمنع توقف التطبيق."
+      "أن يذكر الطالب أهمية هذا الاختبار.",
+      "أن يميز الطالب بين المشكلة التقنية ومشكلة الشبكة.",
+      "أن يستنتج الطالب الحل الصحيح."
     ],
-    hook: "نشاط تمهيدي افتراضي (بسبب تعذر الاتصال).",
+    hook: "هل تعلم أن هذا النص مكتوب مسبقاً لاختبار التطبيق؟",
     contentElements: [
-        { title: "تنبيه هام", details: "حدث خطأ أثناء الاتصال بالذكاء الاصطناعي. التطبيق يعمل في وضع الطوارئ الآن." }
+      { 
+        title: "ماذا يحدث الآن؟", 
+        details: "نحن نقوم بفصل الذكاء الاصطناعي مؤقتاً للتأكد من سلامة واجهة الموقع." 
+      },
+      { 
+        title: "الخطوة التالية", 
+        details: "إذا ظهرت هذه الخطة، فالموقع سليم والمشكلة في المفتاح. إذا ظهرت شاشة بيضاء، فالمشكلة في كود العرض (React)." 
+      }
     ],
-    differentiation: { 
-        gifted: "نشاط إثرائي مقترح", 
-        support: "نشاط علاجي مقترح" 
+    differentiation: {
+      gifted: "تمرين إضافي للمتفوقين.",
+      support: "تمرين مبسط للدعم."
     },
-    assessment: { 
-        formative: "سؤال شفهي", 
-        summative: "واجب منزلي" 
+    assessment: {
+      formative: "سؤال سريع أثناء الحصة.",
+      summative: "واجب منزلي بسيط."
     }
   };
-
-  // 🟢 2. الحماية الشاملة (Try-Catch)
-  try {
-    const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-    // إذا لم يوجد مفتاح، نرجع قارب النجاة فوراً
-    if (!API_KEY || typeof API_KEY !== 'string') {
-        console.error("API Key missing");
-        return LIFE_RAFT;
-    }
-
-    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
-    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
-    
-    // الأمر
-    const promptText = `Create a lesson plan for: "${topic}". Subject: ${subject}. Grade: ${grade}.
-    Strategies: ${strategiesStr}. Content: ${contentStr}.
-    Output JSON only. Arabic language.
-    Required fields: title, gradeLevel, estimatedTime, objectives (array), hook, contentElements (array of title/details), differentiation (gifted/support), assessment (formative/summative).`;
-
-    // الاتصال
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }]
-      })
-    });
-
-    if (!response.ok) throw new Error("Google API Error");
-
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!rawText) throw new Error("No text");
-
-    // تنظيف وتحويل
-    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanText);
-
-    // التأكد من أن البيانات القادمة سليمة، وإلا نستخدم قارب النجاة
-    return {
-        title: parsed.title || LIFE_RAFT.title,
-        gradeLevel: parsed.gradeLevel || LIFE_RAFT.gradeLevel,
-        estimatedTime: parsed.estimatedTime || LIFE_RAFT.estimatedTime,
-        objectives: Array.isArray(parsed.objectives) ? parsed.objectives : LIFE_RAFT.objectives,
-        hook: parsed.hook || LIFE_RAFT.hook,
-        contentElements: Array.isArray(parsed.contentElements) ? parsed.contentElements : LIFE_RAFT.contentElements,
-        differentiation: parsed.differentiation || LIFE_RAFT.differentiation,
-        assessment: parsed.assessment || LIFE_RAFT.assessment
-    };
-
-  } catch (error) {
-    // 🛑 في حالة أي خطأ (شبكة، كود، مفتاح)، نرجع قارب النجاة بدلاً من الشاشة البيضاء
-    console.error("CRITICAL ERROR (Serving Life Raft):", error);
-    return LIFE_RAFT;
-  }
 };
