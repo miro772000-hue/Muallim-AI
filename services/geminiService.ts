@@ -211,7 +211,7 @@ export const generateLessonPlan = async (topic: string, grade?: string, subject?
     9. Output must be in formal Arabic.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-1.5-flash",
       contents: prompt,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
