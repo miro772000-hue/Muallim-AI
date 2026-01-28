@@ -9,47 +9,58 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
       title: data?.title || topic || "عنوان الدرس",
       gradeLevel: data?.gradeLevel || grade || "غير محدد",
       estimatedTime: data?.estimatedTime || "45 دقيقة",
-      objectives: Array.isArray(data?.objectives) ? data.objectives : ["لا توجد أهداف"],
+      objectives: Array.isArray(data?.objectives) ? data.objectives : ["جاري التحميل..."],
       hook: data?.hook || "نشاط تمهيدي",
       contentElements: Array.isArray(data?.contentElements) ? data.contentElements : [],
-      differentiation: { gifted: "-", support: "-" },
-      assessment: { formative: "-", summative: "-" }
+      differentiation: { 
+        gifted: data?.differentiation?.gifted || "أنشطة إثرائية", 
+        support: data?.differentiation?.support || "أنشطة علاجية" 
+      },
+      assessment: { 
+        formative: data?.assessment?.formative || "تقويم تكويني", 
+        summative: data?.assessment?.summative || "تقويم ختامي" 
+      }
     };
   };
 
   try {
-    // 1. فحص وجود المفتاح وشكله
-    if (!API_KEY) throw new Error("المفتاح غير موجود (Empty Key)");
-    if (API_KEY.startsWith('"') || API_KEY.endsWith('"')) throw new Error("المفتاح يحتوي على علامات تنصيص زائدة في Vercel");
-    if (API_KEY.includes("PASTE")) throw new Error("المفتاح لم يتم تغييره في الكود");
+    if (!API_KEY) throw new Error("المفتاح غير موجود");
 
-    const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}". Subject: ${subject}. Grade: ${grade}. Output strictly VALID JSON. Language: Arabic.`;
+    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
+    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
+    
+    const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}".
+    Subject: ${subject}. Grade: ${grade}.
+    Strategies: ${strategiesStr}.
+    Content: ${contentStr}.
+    Output strictly VALID JSON. Language: Arabic.`;
 
-    // 2. محاولة الاتصال مع طباعة الخطأ الصريح
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+    // 👇 هنا التغيير السحري: استخدمنا gemini-pro بدلاً من flash
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        // هذا السطر سيفضح سبب الرفض من جوجل
-        throw new Error(`Google Error ${response.status}: ${errorData.error?.message || response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(`Google Error ${response.status}: ${errorData.error?.message}`);
     }
 
     const data = await response.json();
-    const cleanText = data.candidates?.[0]?.content?.parts?.[0]?.text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+    // تنظيف النص من علامات الكود لضمان عدم حدوث خطأ
+    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+    
     return sanitize(JSON.parse(cleanText));
 
   } catch (error: any) {
-    console.error("Full Error:", error);
-    // 🔴 هنا التغيير: سنعرض تفاصيل الخطأ لكِ في الشاشة
+    console.error("Error:", error);
     return sanitize({
       objectives: [
-        "🔴 تم كشف الخطأ:",
-        `الرسالة: ${error.message}`,
-        "صور الشاشة وارسلها للمساعد فوراً."
+        "حدث خطأ تقني بسيط:",
+        error.message
       ]
     });
   }
