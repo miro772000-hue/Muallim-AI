@@ -2,10 +2,11 @@ import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   
-  // 🔴 هام جداً: امسحي كلمة (AIzaSyBZHmYRnBTds-dNT9oY0bVfHwlXNrgeRgk) والصقي مفتاحك الجديد الطويل مكانها بين علامتي التنصيص
-  const API_KEY = "ضع_مفتاحك_الجديد_هنا_بدلا_من_هذه_الجملة";
+  // 🔴 الخطوة الوحيدة: امسحي الكلمة الإنجليزية بالأسفل وضعي مفتاحك الطويل مكانها
+  const API_KEY = "AIzaSyBZHmYRnBTds-dNT9oY0bVfHwlXNrgeRgk";
 
-  // دالة الحماية
+  // ---------------------------------------------------------
+
   const sanitize = (data: any): LessonPlan => {
     return {
       title: data?.title || topic || "عنوان الدرس",
@@ -20,8 +21,8 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
   };
 
   const tryModel = async (modelName: string, prompt: string): Promise<any> => {
-    // طباعة للمساعدة في كشف الخطأ
-    console.log(`Connecting with key: ${API_KEY.substring(0, 10)}... to model ${modelName}`);
+    // طباعة للتأكد من أن المفتاح الجديد تم قراءته
+    console.log(`Trying model ${modelName} with key starting: ${API_KEY.substring(0,5)}...`);
     
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`, {
       method: "POST",
@@ -30,16 +31,15 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     });
 
     if (!response.ok) {
-        const err = await response.json();
-        console.error(`Model ${modelName} Error:`, err);
-        throw new Error(`Model ${modelName} failed: ${err.error?.message || response.statusText}`);
+        throw new Error(`Model ${modelName} failed`);
     }
     return response.json();
   };
 
   try {
-    if (!API_KEY || API_KEY.includes("ضع_مفتاحك")) {
-        alert("تنبيه: نسيتي وضع المفتاح مكان الجملة العربية في الكود!");
+    // التحقق من أنك وضعتي المفتاح
+    if (API_KEY === "PASTE_YOUR_KEY_HERE" || !API_KEY) {
+        alert("تنبيه: لم تضعي المفتاح مكان كلمة PASTE_YOUR_KEY_HERE في الكود.");
         return sanitize({});
     }
 
@@ -52,7 +52,7 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     Content: ${contentStr}.
     Output strictly VALID JSON. Language: Arabic.`;
 
-    // تجربة الموديلات بالترتيب
+    // القائمة الذهبية للموديلات
     const modelsToTry = ["gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
     let rawText = "";
 
@@ -66,15 +66,15 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
       }
     }
 
-    if (!rawText) throw new Error("فشل الاتصال بكل الموديلات (Flash & Pro).");
+    if (!rawText) throw new Error("فشل الاتصال بجميع الموديلات. تأكدي أن المفتاح مفعل.");
 
     const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
     return sanitize(JSON.parse(cleanText));
 
   } catch (error: any) {
-    alert(`الخطأ النهائي: ${error.message}\nتأكدي أن المفتاح منسوخ بشكل صحيح.`);
+    alert(`حدث خطأ: ${error.message}`);
     return sanitize({
-      objectives: ["حدث خطأ أثناء الاتصال.", error.message]
+      objectives: ["حدث خطأ أثناء الاتصال.", "يرجى مراجعة المفتاح."]
     });
   }
 };
