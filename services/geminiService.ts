@@ -6,61 +6,51 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
 
   const sanitize = (data: any): LessonPlan => {
     return {
-      title: data?.title || topic || "عنوان الدرس",
-      gradeLevel: data?.gradeLevel || grade || "غير محدد",
-      estimatedTime: data?.estimatedTime || "45 دقيقة",
-      objectives: Array.isArray(data?.objectives) ? data.objectives : ["جاري التحميل..."],
-      hook: data?.hook || "نشاط تمهيدي",
-      contentElements: Array.isArray(data?.contentElements) ? data.contentElements : [],
-      differentiation: { 
-        gifted: data?.differentiation?.gifted || "أنشطة إثرائية", 
-        support: data?.differentiation?.support || "أنشطة علاجية" 
-      },
-      assessment: { 
-        formative: data?.assessment?.formative || "تقويم تكويني", 
-        summative: data?.assessment?.summative || "تقويم ختامي" 
-      }
+      title: "فحص الموديلات",
+      gradeLevel: "تشخيص",
+      estimatedTime: "0 دقيقة",
+      objectives: data?.objectives || ["جاري الفحص..."],
+      hook: "نتائج الفحص بالأسفل",
+      contentElements: [],
+      differentiation: { gifted: "-", support: "-" },
+      assessment: { formative: "-", summative: "-" }
     };
   };
 
   try {
-    if (!API_KEY) throw new Error("المفتاح غير موجود");
-
-    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
-    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
-    
-    const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}".
-    Subject: ${subject}. Grade: ${grade}.
-    Strategies: ${strategiesStr}.
-    Content: ${contentStr}.
-    Output strictly VALID JSON. Language: Arabic.`;
-
-    // 👇 هنا التغيير السحري: استخدمنا gemini-pro بدلاً من flash
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+    // هذا الرابط يسأل جوجل: ما هي الموديلات المتاحة لي؟
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Google Error ${response.status}: ${errorData.error?.message}`);
+        const err = await response.json();
+        throw new Error(`فشل جلب القائمة: ${err.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
-    // تنظيف النص من علامات الكود لضمان عدم حدوث خطأ
-    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-    
-    return sanitize(JSON.parse(cleanText));
+    // هنا سنلتقط أسماء الموديلات ونعرضها لك
+    const availableModels = data.models
+        .map((m: any) => m.name) // نأخذ الاسم فقط
+        .filter((name: string) => name.includes("gemini")); // نركز على موديلات جيمناي
 
-  } catch (error: any) {
-    console.error("Error:", error);
     return sanitize({
       objectives: [
-        "حدث خطأ تقني بسيط:",
-        error.message
+        "✅ الموديلات المتاحة لمفتاحك هي:",
+        ...availableModels.slice(0, 5), // نعرض أول 5 موديلات
+        "----------------",
+        "صوري هذه الشاشة وأرسليها لي!"
+      ]
+    });
+
+  } catch (error: any) {
+    return sanitize({
+      objectives: [
+        "🔴 خطأ خطير:",
+        error.message,
+        "تأكدي أنك مفعلة Generative Language API في جوجل"
       ]
     });
   }
