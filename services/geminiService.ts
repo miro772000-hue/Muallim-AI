@@ -2,10 +2,8 @@ import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   
-  // 🔴 الخطوة الوحيدة: امسحي الكلمة الإنجليزية بالأسفل وضعي مفتاحك الطويل مكانها
-  const API_KEY = "AIzaSyBZHmYRnBTds-dNT9oY0bVfHwlXNrgeRgk";
-
-  // ---------------------------------------------------------
+  // هذا السطر هو الذي يقرأ المفتاح من إعدادات Vercel التي قمتِ بحفظها الآن
+  const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
   const sanitize = (data: any): LessonPlan => {
     return {
@@ -20,61 +18,51 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     };
   };
 
-  const tryModel = async (modelName: string, prompt: string): Promise<any> => {
-    // طباعة للتأكد من أن المفتاح الجديد تم قراءته
-    console.log(`Trying model ${modelName} with key starting: ${API_KEY.substring(0,5)}...`);
-    
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-    });
-
-    if (!response.ok) {
-        throw new Error(`Model ${modelName} failed`);
-    }
-    return response.json();
-  };
-
   try {
-    // التحقق من أنك وضعتي المفتاح
-    if (API_KEY === "PASTE_YOUR_KEY_HERE" || !API_KEY) {
-        alert("تنبيه: لم تضعي المفتاح مكان كلمة PASTE_YOUR_KEY_HERE في الكود.");
-        return sanitize({});
+    // التحقق من أن Vercel قرأ المفتاح
+    if (!API_KEY || API_KEY.startsWith("PASTE")) {
+        throw new Error("لم يتم العثور على المفتاح في إعدادات Vercel");
     }
 
     const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
     const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
-    
+
     const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}".
     Subject: ${subject}. Grade: ${grade}.
     Strategies: ${strategiesStr}.
     Content: ${contentStr}.
     Output strictly VALID JSON. Language: Arabic.`;
 
-    // القائمة الذهبية للموديلات
-    const modelsToTry = ["gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
-    let rawText = "";
+    // محاولة الاتصال بالموديل السريع (Flash)
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+    });
 
-    for (const model of modelsToTry) {
-      try {
-        const data = await tryModel(model, promptText);
-        rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (rawText) break;
-      } catch (e) {
-        continue;
-      }
+    if (!response.ok) {
+         // إذا فشل، نحاول بالموديل العادي (Pro)
+         const retryResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
+         });
+         
+         if (!retryResponse.ok) throw new Error("فشل الاتصال بجميع الموديلات");
+         
+         const data = await retryResponse.json();
+         const cleanText = data.candidates?.[0]?.content?.parts?.[0]?.text.replace(/```json/g, '').replace(/```/g, '').trim();
+         return sanitize(JSON.parse(cleanText));
     }
 
-    if (!rawText) throw new Error("فشل الاتصال بجميع الموديلات. تأكدي أن المفتاح مفعل.");
-
-    const cleanText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+    const data = await response.json();
+    const cleanText = data.candidates?.[0]?.content?.parts?.[0]?.text.replace(/```json/g, '').replace(/```/g, '').trim();
     return sanitize(JSON.parse(cleanText));
 
   } catch (error: any) {
-    alert(`حدث خطأ: ${error.message}`);
+    console.error(error);
     return sanitize({
-      objectives: ["حدث خطأ أثناء الاتصال.", "يرجى مراجعة المفتاح."]
+      objectives: ["حدث خطأ في الاتصال.", "يرجى المحاولة مرة أخرى لاحقاً."]
     });
   }
 };
