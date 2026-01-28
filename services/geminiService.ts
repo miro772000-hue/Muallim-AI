@@ -4,50 +4,29 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
   
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
-  // دالة الحماية (عشان الموقع ما يوقفش لو حصل أي ظرف)
   const sanitize = (data: any): LessonPlan => {
     return {
       title: data?.title || topic || "عنوان الدرس",
       gradeLevel: data?.gradeLevel || grade || "غير محدد",
       estimatedTime: data?.estimatedTime || "45 دقيقة",
-      objectives: Array.isArray(data?.objectives) ? data.objectives : ["جاري توليد الأهداف..."],
-      hook: data?.hook || "نشاط تمهيدي مقترح",
+      objectives: Array.isArray(data?.objectives) ? data.objectives : ["جاري التحميل..."],
+      hook: data?.hook || "نشاط تمهيدي",
       contentElements: Array.isArray(data?.contentElements) ? data.contentElements : [],
-      differentiation: { 
-        gifted: data?.differentiation?.gifted || "أنشطة إثرائية", 
-        support: data?.differentiation?.support || "أنشطة علاجية" 
-      },
-      assessment: { 
-        formative: data?.assessment?.formative || "أسئلة شفوية", 
-        summative: data?.assessment?.summative || "واجب منزلي" 
-      }
+      differentiation: { gifted: "-", support: "-" },
+      assessment: { formative: "-", summative: "-" }
     };
   };
 
   try {
-    if (!API_KEY) throw new Error("المفتاح غير موجود");
+    // 1. التأكد من وجود المفتاح
+    if (!API_KEY) throw new Error("المفتاح غير موجود في إعدادات Vercel");
 
-    // 👇 هنا الحل: ثبتنا الاسم على الموديل السريع والمجاني اللي ظهر في قائمتك
-    // gemini-1.5-flash هو الأفضل للحسابات المجانية
+    // 2. استخدام الموديل السريع والمجاني (فلاش)
     const MODEL_NAME = "gemini-1.5-flash";
 
     const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}".
     Subject: ${subject}. Grade: ${grade}.
-    Strategies: ${strategies || "Interactive"}.
-    Content: ${contentElements || "Core concepts"}.
-    
-    Output strictly VALID JSON with this structure:
-    {
-      "title": "...",
-      "gradeLevel": "...",
-      "estimatedTime": "...",
-      "objectives": ["...", "..."],
-      "hook": "...",
-      "contentElements": [{"title": "...", "details": "..."}],
-      "differentiation": {"gifted": "...", "support": "..."},
-      "assessment": {"formative": "...", "summative": "..."}
-    }
-    Language: Arabic.`;
+    Output strictly VALID JSON. Language: Arabic.`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`, {
       method: "POST",
@@ -56,22 +35,9 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     });
 
     if (!response.ok) {
-        const errorData = await response.json();
-        // لو فلاش فشل، نجرب القديم كاحتياطي أخير
-        if (response.status === 404 || response.status === 429) {
-            console.log("Retrying with gemini-pro...");
-            const retry = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
-            });
-            if (retry.ok) {
-                const retryData = await retry.json();
-                const retryText = retryData.candidates?.[0]?.content?.parts?.[0]?.text;
-                return sanitize(JSON.parse(retryText.replace(/```json/g, '').replace(/```/g, '').trim()));
-            }
-        }
-        throw new Error(`Google Error: ${errorData.error?.message}`);
+        const errorData = await response.json().catch(() => ({}));
+        // هنا السر: سنعرض رسالة الخطأ القادمة من جوجل كما هي
+        throw new Error(`Google Error (${response.status}): ${errorData.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
@@ -81,10 +47,12 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
 
   } catch (error: any) {
     console.error("Final Error:", error);
+    // 🔴 سنعرض الخطأ لكِ على الشاشة
     return sanitize({
       objectives: [
-        "حدث خطأ مؤقت في الخدمة.",
-        "يرجى الانتظار دقيقة والمحاولة مرة أخرى."
+        "🔴 الخطأ الحقيقي هو:",
+        error.message, 
+        "صوري هذه الشاشة وأرسليها فوراً"
       ]
     });
   }
