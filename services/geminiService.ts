@@ -2,7 +2,6 @@ import { LessonPlan } from "../types";
 
 export const generateLessonPlan = async (topic: string, grade: string, subject: string, strategies?: string[], contentElements?: string[]): Promise<LessonPlan> => {
   
-  // هذا السطر هو الذي يقرأ المفتاح من إعدادات Vercel التي قمتِ بحفظها الآن
   const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
 
   const sanitize = (data: any): LessonPlan => {
@@ -10,7 +9,7 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
       title: data?.title || topic || "عنوان الدرس",
       gradeLevel: data?.gradeLevel || grade || "غير محدد",
       estimatedTime: data?.estimatedTime || "45 دقيقة",
-      objectives: Array.isArray(data?.objectives) ? data.objectives : ["جاري التحميل..."],
+      objectives: Array.isArray(data?.objectives) ? data.objectives : ["لا توجد أهداف"],
       hook: data?.hook || "نشاط تمهيدي",
       contentElements: Array.isArray(data?.contentElements) ? data.contentElements : [],
       differentiation: { gifted: "-", support: "-" },
@@ -19,21 +18,14 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
   };
 
   try {
-    // التحقق من أن Vercel قرأ المفتاح
-    if (!API_KEY || API_KEY.startsWith("PASTE")) {
-        throw new Error("لم يتم العثور على المفتاح في إعدادات Vercel");
-    }
+    // 1. فحص وجود المفتاح وشكله
+    if (!API_KEY) throw new Error("المفتاح غير موجود (Empty Key)");
+    if (API_KEY.startsWith('"') || API_KEY.endsWith('"')) throw new Error("المفتاح يحتوي على علامات تنصيص زائدة في Vercel");
+    if (API_KEY.includes("PASTE")) throw new Error("المفتاح لم يتم تغييره في الكود");
 
-    const strategiesStr = Array.isArray(strategies) ? strategies.join(', ') : (strategies || '');
-    const contentStr = Array.isArray(contentElements) ? contentElements.join(', ') : (contentElements || '');
+    const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}". Subject: ${subject}. Grade: ${grade}. Output strictly VALID JSON. Language: Arabic.`;
 
-    const promptText = `Act as an expert Egyptian teacher. Create a detailed lesson plan for: "${topic}".
-    Subject: ${subject}. Grade: ${grade}.
-    Strategies: ${strategiesStr}.
-    Content: ${contentStr}.
-    Output strictly VALID JSON. Language: Arabic.`;
-
-    // محاولة الاتصال بالموديل السريع (Flash)
+    // 2. محاولة الاتصال مع طباعة الخطأ الصريح
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,18 +33,9 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     });
 
     if (!response.ok) {
-         // إذا فشل، نحاول بالموديل العادي (Pro)
-         const retryResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
-         });
-         
-         if (!retryResponse.ok) throw new Error("فشل الاتصال بجميع الموديلات");
-         
-         const data = await retryResponse.json();
-         const cleanText = data.candidates?.[0]?.content?.parts?.[0]?.text.replace(/```json/g, '').replace(/```/g, '').trim();
-         return sanitize(JSON.parse(cleanText));
+        const errorData = await response.json().catch(() => ({}));
+        // هذا السطر سيفضح سبب الرفض من جوجل
+        throw new Error(`Google Error ${response.status}: ${errorData.error?.message || response.statusText}`);
     }
 
     const data = await response.json();
@@ -60,9 +43,14 @@ export const generateLessonPlan = async (topic: string, grade: string, subject: 
     return sanitize(JSON.parse(cleanText));
 
   } catch (error: any) {
-    console.error(error);
+    console.error("Full Error:", error);
+    // 🔴 هنا التغيير: سنعرض تفاصيل الخطأ لكِ في الشاشة
     return sanitize({
-      objectives: ["حدث خطأ في الاتصال.", "يرجى المحاولة مرة أخرى لاحقاً."]
+      objectives: [
+        "🔴 تم كشف الخطأ:",
+        `الرسالة: ${error.message}`,
+        "صور الشاشة وارسلها للمساعد فوراً."
+      ]
     });
   }
 };
